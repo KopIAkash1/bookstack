@@ -1,63 +1,57 @@
-// .github/scripts/bookstack.js
+// Подключаем библиотеку для конвертации Markdown в HTML
+const marked = require('marked');
+const fetch = require('node-fetch');
 
-const { marked } = require('marked'); // Импортируем parse из marked
-const fetch = require('node-fetch'); // Для отправки POST-запросов
-const fs = require('fs');
-
-// Пример: получаем данные из JSON-файла (можно заменить на payload из GitHub Actions)
-const issueData = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf-8'));
-const { title, body, action } = issueData.issue;
+// Получаем данные Issue из переменных окружения
+const title = process.env.ISSUE_TITLE || 'Без названия';
+const problem = process.env.ISSUE_PROBLEM || 'Описание проблемы отсутствует';
+const cause = process.env.ISSUE_CAUSE || 'Причина не указана';
+const solution = process.env.ISSUE_SOLUTION || 'Решение не указано';
+const labels = process.env.ISSUE_LABELS || '';
+const url = process.env.ISSUE_URL || '#';
 
 // Конвертируем Markdown в HTML
-const htmlBody = marked.parse(body);
+const htmlProblem = marked.parse(problem);
+const htmlCause = marked.parse(cause);
+const htmlSolution = marked.parse(solution);
 
-// Данные для API BookStack
-const BOOKSTACK_API_URL = process.env.BOOKSTACK_API_URL;
-const BOOKSTACK_API_TOKEN = process.env.BOOKSTACK_API_TOKEN;
+// Формируем полный HTML-контент страницы по методологии KCS
+const fullHtml = `
+<h1>${title}</h1>
+<h2>Проблема</h2>
+${htmlProblem}
+<h2>Причина</h2>
+${htmlCause}
+<h2>Решение</h2>
+${htmlSolution}
+<h2>Ссылки</h2>
+<p><strong>Связанная задача:</strong> <a href='${url}'>${url}</a></p>
+<h2>Метки</h2>
+<p>${labels}</p>
+`;
 
-if (!BOOKSTACK_API_URL || !BOOKSTACK_API_TOKEN) {
-  console.error('ERROR: Не настроены BOOKSTACK_API_URL или BOOKSTACK_API_TOKEN');
-  process.exit(1);
-}
+// Создаём объект для запроса к API BookStack
+const payload = {
+  name: title,
+  book_id: process.env.BOOKSTACK_BOOK_ID,
+  html: fullHtml
+};
 
-// Функция создания или обновления страницы
-async function sendToBookStack() {
-  try {
-    // Настраиваем URL и метод в зависимости от события
-    let url = `${BOOKSTACK_API_URL}/api/pages`;
-    let method = 'POST';
-    
-    if (action === 'edited' || action === 'closed') {
-      // Здесь можно реализовать поиск страницы по title и обновление
-      method = 'PUT';
-      url = `${BOOKSTACK_API_URL}/api/pages/slug/${encodeURIComponent(title)}`;
-    }
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Token ${BOOKSTACK_API_TOKEN}`
-      },
-      body: JSON.stringify({
-        name: title,
-        html: htmlBody,
-        // Можно добавить другие поля, например 'book_id' или 'chapter_id'
-      })
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ошибка BookStack API: ${response.status} - ${text}`);
-    }
-
-    const data = await response.json();
-    console.log('Страница успешно отправлена в BookStack:', data);
-  } catch (err) {
-    console.error('Ошибка при отправке в BookStack:', err);
-    process.exit(1);
+// Отправляем POST-запрос к API BookStack для создания страницы
+fetch(`${process.env.BOOKSTACK_URL}/api/pages`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Token ${process.env.BOOKSTACK_API_ID}:${process.env.BOOKSTACK_API_SECRET}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(payload)
+})
+.then(res => {
+  if (!res.ok) {
+    console.error('Не удалось создать страницу:', res.status, res.statusText);
+    return res.text().then(text => console.error(text));
+  } else {
+    console.log('Страница успешно создана');
   }
-}
-
-// Запускаем
-sendToBookStack();
+})
+.catch(err => console.error('Ошибка запроса:', err));
