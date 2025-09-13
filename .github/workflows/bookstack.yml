@@ -1,0 +1,23 @@
+name: GitHub to BookStack
+
+on:
+  issues:
+    types: [opened, edited, closed]
+
+jobs:
+  bookstack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install marked node-fetch
+      - name: Generate BookStack Article
+        run: node .github/scripts/bookstack.js
+        env:
+          BOOKSTACK_API_URL: ${{ secrets.BOOKSTACK_API_URL }}
+          BOOKSTACK_API_TOKEN: ${{ secrets.BOOKSTACK_API_TOKEN }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
