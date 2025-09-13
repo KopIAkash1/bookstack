@@ -2,7 +2,7 @@ const marked = require('marked');
 
 // Данные Issue (можно менять или брать из env)
 const title = process.env.ISSUE_TITLE || 'Без названия';
-const problem = process.env.ISSUE_PROBLEM || 'Описание проблемы отсутствует';
+const problem = process.env.ISSUE_BODY || 'Описание проблемы отсутствует';
 const cause = process.env.ISSUE_CAUSE || 'Причина не указана';
 const solution = process.env.ISSUE_SOLUTION || 'Решение не указано';
 const labels = process.env.ISSUE_LABELS || '';
