@@ -1,8 +1,6 @@
-// Подключаем библиотеку для конвертации Markdown в HTML
 const marked = require('marked');
-const fetch = require('node-fetch');
 
-// Получаем данные Issue из переменных окружения
+// Данные Issue (можно менять или брать из env)
 const title = process.env.ISSUE_TITLE || 'Без названия';
 const problem = process.env.ISSUE_PROBLEM || 'Описание проблемы отсутствует';
 const cause = process.env.ISSUE_CAUSE || 'Причина не указана';
@@ -10,12 +8,17 @@ const solution = process.env.ISSUE_SOLUTION || 'Решение не указан
 const labels = process.env.ISSUE_LABELS || '';
 const url = process.env.ISSUE_URL || '#';
 
+const bookstackUrl = process.env.BOOKSTACK_URL || 'http://localhost:8080';
+const bookId = process.env.BOOKSTACK_BOOK_ID || '1';
+const apiId = process.env.BOOKSTACK_API_ID || 'your_api_id';
+const apiSecret = process.env.BOOKSTACK_API_SECRET || 'your_api_secret';
+
 // Конвертируем Markdown в HTML
 const htmlProblem = marked.parse(problem);
 const htmlCause = marked.parse(cause);
 const htmlSolution = marked.parse(solution);
 
-// Формируем полный HTML-контент страницы по методологии KCS
+// Формируем полный HTML-контент
 const fullHtml = `
 <h1>${title}</h1>
 <h2>Проблема</h2>
@@ -30,28 +33,18 @@ ${htmlSolution}
 <p>${labels}</p>
 `;
 
-// Создаём объект для запроса к API BookStack
+// Создаем JSON payload
 const payload = {
   name: title,
-  book_id: process.env.BOOKSTACK_BOOK_ID,
+  book_id: bookId,
   html: fullHtml
 };
 
-// Отправляем POST-запрос к API BookStack для создания страницы
-fetch(`${process.env.BOOKSTACK_URL}/api/pages`, {
-  method: 'POST',
-  headers: {
-    'Authorization': `Token ${process.env.BOOKSTACK_API_ID}:${process.env.BOOKSTACK_API_SECRET}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify(payload)
-})
-.then(res => {
-  if (!res.ok) {
-    console.error('Не удалось создать страницу:', res.status, res.statusText);
-    return res.text().then(text => console.error(text));
-  } else {
-    console.log('Страница успешно создана');
-  }
-})
-.catch(err => console.error('Ошибка запроса:', err));
+// Генерируем команду curl
+const curlCommand = `curl -X POST "${bookstackUrl}/api/pages" \\
+-H "Authorization: Token ${apiId}:${apiSecret}" \\
+-H "Content-Type: application/json" \\
+-d '${JSON.stringify(payload)}'`;
+
+console.log('Скопируйте и выполните команду curl:');
+console.log(curlCommand);
