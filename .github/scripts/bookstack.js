@@ -1,44 +1,63 @@
-import { marked } from 'marked';
+// .github/scripts/bookstack.js
 
+const { marked } = require('marked'); // Импортируем parse из marked
+const fetch = require('node-fetch'); // Для отправки POST-запросов
 const fs = require('fs');
-const fetch = require('node-fetch');
-const marked = require('marked');
 
-const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
+// Пример: получаем данные из JSON-файла (можно заменить на payload из GitHub Actions)
+const issueData = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf-8'));
+const { title, body, action } = issueData.issue;
 
-const title = event.issue.title;
-const body = event.issue.body;
-const url = event.issue.html_url;
-const labels = event.issue.labels.map(l => l.name).join(', ');
+// Конвертируем Markdown в HTML
+const htmlBody = marked.parse(body);
 
-const htmlBody = marked(body);
+// Данные для API BookStack
+const BOOKSTACK_API_URL = process.env.BOOKSTACK_API_URL;
+const BOOKSTACK_API_TOKEN = process.env.BOOKSTACK_API_TOKEN;
 
-const template = `
-<h1>${title}</h1>
-<h2>Проблема</h2>
-<p>${htmlBody}</p>
-<h2>Причина</h2><p></p>
-<h2>Решение</h2><p></p>
-<h2>Ссылки</h2><p><a href="${url}">Issue на GitHub</a></p>
-<h2>Метки</h2><p>${labels}</p>
-`;
-
-async function createPage() {
-  const response = await fetch(`${process.env.BOOKSTACK_API_URL}/api/pages`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${process.env.BOOKSTACK_API_TOKEN}:${process.env.BOOKSTACK_API_SECRET}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: title,
-      html: template,
-      book_id: 2,
-      chapter_id: null
-    })
-  });
-  const data = await response.json();
-  console.log(data);
+if (!BOOKSTACK_API_URL || !BOOKSTACK_API_TOKEN) {
+  console.error('ERROR: Не настроены BOOKSTACK_API_URL или BOOKSTACK_API_TOKEN');
+  process.exit(1);
 }
 
-createPage();
+// Функция создания или обновления страницы
+async function sendToBookStack() {
+  try {
+    // Настраиваем URL и метод в зависимости от события
+    let url = `${BOOKSTACK_API_URL}/api/pages`;
+    let method = 'POST';
+    
+    if (action === 'edited' || action === 'closed') {
+      // Здесь можно реализовать поиск страницы по title и обновление
+      method = 'PUT';
+      url = `${BOOKSTACK_API_URL}/api/pages/slug/${encodeURIComponent(title)}`;
+    }
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${BOOKSTACK_API_TOKEN}`
+      },
+      body: JSON.stringify({
+        name: title,
+        html: htmlBody,
+        // Можно добавить другие поля, например 'book_id' или 'chapter_id'
+      })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Ошибка BookStack API: ${response.status} - ${text}`);
+    }
+
+    const data = await response.json();
+    console.log('Страница успешно отправлена в BookStack:', data);
+  } catch (err) {
+    console.error('Ошибка при отправке в BookStack:', err);
+    process.exit(1);
+  }
+}
+
+// Запускаем
+sendToBookStack();
