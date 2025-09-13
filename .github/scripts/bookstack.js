@@ -1,3 +1,5 @@
+import { marked } from 'marked';
+
 const fs = require('fs');
 const fetch = require('node-fetch');
 const marked = require('marked');
